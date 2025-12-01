@@ -1,84 +1,62 @@
 networks:
-  evolution-net:
-    name: evolution-net
+  sistd-net:
+    name: sistd-net
     driver: bridge
-  # dokploy-network:
-  #   external: true
 
 services:
-  api:
-    container_name: evolution_api
-    image: evoapicloud/evolution-api:latest
+  sistd-n8n:
+    container_name: sistd-n8n
+    image: docker.n8n.io/n8nio/n8n:1.111.1
     restart: always
-    depends_on:
-      redis:
-        condition: service_started
-      evolution-postgres:
-        condition: service_healthy
     ports:
-      - "127.0.0.1:8080:8080"
+      - 9000:5678
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-user}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-password}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=${N8N_PORT:-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - N8N_EDITOR_BASE_URL=http://${N8N_HOST:-localhost}:${N8N_PORT:-5678}/
+      - N8N_EMAIL_MODE=
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # - PINECONE_API_KEY=${PINECONE_API_KEY:-}
     volumes:
-      - ./VOLUMES/evolution_instances:/evolution/instances
+      # Isso permite que o docker de DENTRO do n8n comande o docker de FORA
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./volumes/.n8n:/home/node/.n8n
+      - ./volumes/shared:/data/shared
+      - ./volumes/local-files:/files
     networks:
-      - evolution-net
-      # - dokploy-network
-    env_file:
-      - .env
-    expose:
-      - "8080"
+      - sistd-net
 
-  frontend:
-    container_name: evolution_frontend
-    image: evoapicloud/evolution-manager:latest
-    restart: always
-    ports:
-      - "3000:80"
-    networks:
-      - evolution-net
-
-  redis:
-    container_name: evolution_redis
-    image: redis:latest
+  sistd-redis:
+    container_name: sistd-redis
+    image: redis:8.2.2
     restart: always
     command: >
       redis-server --port 6379 --appendonly yes
     volumes:
-      - ./VOLUMES/evolution_redis:/data
+      - ./VOLUMES/sistd-redis:/data
     networks:
-      evolution-net:
+      sistd-net:
         aliases:
-          - evolution-redis
-      # dokploy-network:
-      #   aliases:
-      #     - evolution-redis
+          - sistd-redis
     ports:
-      - 6379:6379
-
-  evolution-postgres:
-    container_name: evolution_postgres
-    image: postgres:15
+      - 9001:6379
+    
+  # API Simples para processar consultas na sintaxe do MongoDB (aproximada)
+  sistd-api-backend:
+    container_name: sistd-api-backend
+    image: node:20-alpine
     restart: always
-    env_file:
-      - .env
-    command:
-      - postgres
-      - -c
-      - max_connections=1000
-      - -c
-      - listen_addresses=*
-    environment:
-      - POSTGRES_DB=${DATABASE_DB}
-      - POSTGRES_USER=${DATABASE_USER}
-      - POSTGRES_PASSWORD=${DATABASE_PASS}
+    working_dir: /usr/src/app # Diretório de trabalho dentro do container
+    command: sh -c "npm install && npm start" # Instala dependências e inicia
     volumes:
-      - ./VOLUMES/postgres_data:/var/lib/postgresql/data
-    networks:
-      - evolution-net
-      # - dokploy-network
+      - ./api-backend:/usr/src/app
     ports:
-      - 9432:5432
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - 9002:3002 # Acesso do host / Porta 3002 é usada pelo Express (ver .env.api)
+    networks:
+      - sistd-net # Acesso à rede onde o n8n está
+    env_file:
+      - ./api-backend/.env.api # Carrega as credenciais
