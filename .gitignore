@@ -2,6 +2,7 @@
 .env.api
 .git/
 .vscode/
-VOLUMES/
+volumes/
 node_modules/
 config-teste/
+setup/credentials.json

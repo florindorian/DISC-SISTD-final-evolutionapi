@@ -10,23 +10,33 @@ services:
     restart: always
     ports:
       - 9000:5678
+    entrypoint: ["/setup/docker-entrypoint.sh"]
     environment:
+      # Autenticação
       - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-user}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-password}
+      
+      # Configurações básicas
       - N8N_HOST=${N8N_HOST:-localhost}
       - N8N_PORT=${N8N_PORT:-5678}
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
       - N8N_EDITOR_BASE_URL=http://${N8N_HOST:-localhost}:${N8N_PORT:-5678}/
       - N8N_EMAIL_MODE=
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      # - PINECONE_API_KEY=${PINECONE_API_KEY:-}
+
+      # Serviços externos
+      - GEMINI_API_KEY
+      - MONGO_CONNECTION_STRING
+      - TWILIO_ACCOUNT_SID
+      - TWILIO_AUTH_TOKEN
+      
     volumes:
-      # Isso permite que o docker de DENTRO do n8n comande o docker de FORA
       - /var/run/docker.sock:/var/run/docker.sock
       - ./volumes/.n8n:/home/node/.n8n
       - ./volumes/shared:/data/shared
       - ./volumes/local-files:/files
+      - ./setup:/setup:ro  # ⬅️ Monta diretório setup (read-only)
+      
     networks:
       - sistd-net
 
@@ -34,29 +44,27 @@ services:
     container_name: sistd-redis
     image: redis:8.2.2
     restart: always
-    command: >
-      redis-server --port 6379 --appendonly yes
+    command: redis-server --port 6379 --appendonly yes
     volumes:
-      - ./VOLUMES/sistd-redis:/data
+      - ./volumes/sistd-redis:/data
     networks:
       sistd-net:
         aliases:
           - sistd-redis
     ports:
       - 9001:6379
-    
-  # API Simples para processar consultas na sintaxe do MongoDB (aproximada)
+
   sistd-api-backend:
     container_name: sistd-api-backend
     image: node:20-alpine
     restart: always
-    working_dir: /usr/src/app # Diretório de trabalho dentro do container
-    command: sh -c "npm install && npm start" # Instala dependências e inicia
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npm start"
     volumes:
       - ./api-backend:/usr/src/app
     ports:
-      - 9002:3002 # Acesso do host / Porta 3002 é usada pelo Express (ver .env.api)
+      - 9002:3002
     networks:
-      - sistd-net # Acesso à rede onde o n8n está
+      - sistd-net
     env_file:
-      - ./api-backend/.env.api # Carrega as credenciais
+      - ./api-backend/.env.api

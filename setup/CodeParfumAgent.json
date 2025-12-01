@@ -1,0 +1,1456 @@
+{
+  "name": "CodeParfumAgent",
+  "nodes": [
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "id": "930dd4cc-f43c-4b74-ae5c-6e45085068e2",
+      "name": "Espera para responder",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        400
+      ],
+      "webhookId": "5647dd57-cf90-4dff-aaaf-cdc2eec6f09f",
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ `mensagens-${$('Set Number').item.json.number}` }}",
+        "messageData": "={{ $('Dados-cliente').item.json.text }}"
+      },
+      "id": "842073de-c25e-48eb-b1a5-bcc53146d80f",
+      "name": "Acumula Msg",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        176
+      ],
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "mensagens",
+        "key": "={{ `mensagens-${$('Set Number').item.json.number}` }}",
+        "options": {}
+      },
+      "id": "c3e6675a-e91b-49d9-b44a-7a5825057eab",
+      "name": "Pega Msg Acumuladas",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        272,
+        400
+      ],
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "wait-time",
+        "value": "ativo",
+        "expire": true,
+        "ttl": 20
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        400
+      ],
+      "id": "adb1b182-f03f-417c-969f-60839b972d00",
+      "name": "wait-time",
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "66769f20-c52b-41a6-a926-a7bb74465580",
+              "leftValue": "={{ $('check wait-time').item.json['wait-time'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        256,
+        176
+      ],
+      "id": "3f6d2828-3f15-4ba8-9f07-e9f60cd0b2b2",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        864
+      ],
+      "id": "a1f9028d-59bd-4878-b371-906ed9fa75da",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "7OPa2nwcEX2iD3FI",
+          "name": "Evol_Gemini(PaLM)1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<MENSAGEM>\n<MAIS-RECENTE>\n{{ $('Pega Msg Acumuladas').item.json.mensagens[0] }}\n</MAIS-RECENTE>\n<ANTERIORES>\n{{ $('Pega Msg Acumuladas').item.json.mensagens.slice(1).join('\\n') }}\n</ANTERIORES>\n</MENSAGEM>",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=Com base na <MENSAGEM> recebida (e verificando primeiramente se a <MAIS-RECENTE> muda as intenções anteriores por ter mais prioridade), selecione a intenção do usuário e associe a uma e somente uma das seguintes opções de funcionalidade:\n\n(0) finalizar o atendimento\n\n(1) questionamentos gerais\n-> DADOS NECESSÁRIOS POSSÍVEIS:\n* Nenhum\n-> CARACTERÍSTICAS DESTA CATEGORIA (TIPOS DE DÚVIDAS NÃO RELACIONADAS ÀS OUTRAS FUNÇÕES/AÇÕES)\n* Dúvidas gerais sobre o negócio: horário de atendimento; custo de delivery; problemas com produtos (produto danificado, alergias etc.) ou entregas (atraso, entrega incompleta); reclamações; devoluções; reembolso; cadastro; ...\n* Não selecionar esta opção se a dúvida se enquadrar em outra categoria primeiro (quais categorias, produtos, promoções, informações sobre um produto específico, ...)\n* Quaisquer outros tipos de dúvidas não explicitadas\n(OBS: Consultar <REGRAS-DE-NEGOCIO> abaixo para responder a isso)\n\n(2) consultar categorias\n-> DADOS NECESSÁRIOS POSSÍVEIS:\n* Nenhum\n\n(3) consultar produtos\n-> DADOS NECESSÁRIOS POSSÍVEIS:\n* Data (ano, mês e/ou dia, mas se não fornecido, considerar a \"data atual\", a qual está diretamente ligada ao \"ciclo atual\" que pode ser descoberto a partir dela comparando se ela está entre o início e o fim do ciclo)\n* Número do ciclo (inteiro, de 1 a 12); DEFAULT: 0 (caso não fornecido, representando o ciclo atual)\n-> CARACTERÍSTICAS DESTA FUNÇÃO\n* Os números dos ciclos se repetem a cada ano. Então nunca será permitido ao cliente consultar os ciclos de anos anteriores, apenas do ano atual.\n\n(4) consultar promocoes\n-> DADOS NECESSÁRIOS POSSÍVEIS:\n* Data (ano, mês e/ou dia, mas se não fornecido, considerar a \"data atual\", a qual está diretamente ligada ao \"ciclo atual\" que pode ser descoberto a partir dela comparando se ela está entre o início e o fim do ciclo)\n* Número do ciclo (inteiro, de 1 a 12); DEFAULT: 0 (caso não fornecido, representando o ciclo atual)\n-> CARACTERÍSTICAS DESTA FUNÇÃO\n* Os números dos ciclos se repetem a cada ano. Então nunca será permitido ao cliente consultar os ciclos de anos anteriores, apenas do ano atual.\n\n(5) saber mais informacoes sobre um produto especifico\n-> DADOS NECESSÁRIOS POSSÍVEIS:\n* Nome do produto\n* Número do ciclo (inteiro, de 1 a 12); DEFAULT: 0 (caso não fornecido, representando o ciclo atual)\n\n\nRetorne a ação/função a ser realizada pela API do backend bem como os dados relevantes recomendados. O formato deve seguir o exemplo da ferramenta Output Parser, com o máximo de dados que conseguir, e deixando vazio os campos que não conseguir:\n{{ $('Structured Output Parser').params.jsonSchemaExample }}\n\nOBS: Nomes artísticos e criativos não correspondem ao campo \"produto\", pois este deve ser o nome de um objeto. Esses nomes diferentes devem ser ou a \"marca\" ou a \"linha\" do produto. Você deve interpretar a entrada do cliente para saber a qual campo atribuir as informações. Abaixo estão alguns exemplos de produtos da loja:\n\n[{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Espectro Amazônico\",\n  \"produto\": \"Paleta de Sombras Quentes\"\n},\n{\n  \"marca\": \"Pelos Brilhantes\",\n  \"linha\": \"Patas Cheirosas\",\n  \"produto\": \"Tônico Facial\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Toque Aveludado\",\n  \"produto\": \"Loção Hidratante Corporal\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Ícone da Beleza\",\n  \"produto\": \"Pincel para Base\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Pigmento Digital\",\n  \"produto\": \"Gloss Labial\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Aurora Virtual\",\n  \"produto\": \"Máscara para Cílios Volume e Definição\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Fórmula da Floresta\",\n  \"produto\": \"Máscara para Cílios\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Beleza Binária\",\n  \"produto\": \"Iluminador\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Algoritmo da Natureza\",\n  \"produto\": \"Óleo Bronzeador\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Pigmentação Digital\",\n  \"produto\": \"Cera Modeladora\"\n},\n{\n  \"marca\": \"Segredos do Rio\",\n  \"linha\": \"Correnteza Encantada\",\n  \"produto\": \"Shampoo para Cabelos Oleosos\"\n},\n{\n  \"marca\": \"Amazônia 4.0\",\n  \"linha\": \"Conexão Natural\",\n  \"produto\": \"Kit Relaxamento Corporal\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Código Selvagem\",\n  \"produto\": \"Pó Facial Compacto com FPS 15\"\n},\n{\n  \"marca\": \"Aromas da Amazônia\",\n  \"linha\": \"Névoa da Manhã\",\n  \"produto\": \"Esfoliante Facial\"\n},\n{\n  \"marca\": \"Raios de Sol Digital\",\n  \"linha\": \"Energia Solar\",\n  \"produto\": \"Kit Cuidados com a Pele Sensível\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Fórmula da Floresta\",\n  \"produto\": \"Blush\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Relaxamento Profundo\",\n  \"produto\": \"Óleo Corporal Iluminador\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Aurora Virtual\",\n  \"produto\": \"Condicionador para Cabelos Coloridos\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Toque Aveludado\",\n  \"produto\": \"Creme para os Pés\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Espectro Amazônico\",\n  \"produto\": \"Delineador em Caneta\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Toque Intuitivo\",\n  \"produto\": \"Pincel para Sombra\"\n},\n{\n  \"marca\": \"Amazônia 4.0\",\n  \"linha\": \"Biotecnologia da Beleza\",\n  \"produto\": \"Curvador de Cílios\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Espectro Amazônico\",\n  \"produto\": \"Spray Fixador\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Paleta de Bits\",\n  \"produto\": \"Lápis para Sobrancelhas\"\n},\n{\n  \"marca\": \"Segredos do Rio\",\n  \"linha\": \"Correnteza Encantada\",\n  \"produto\": \"Condicionador para Cabelos Oleosos\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Renovação da Pele\",\n  \"produto\": \"Bálsamo Labial\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Relaxamento Profundo\",\n  \"produto\": \"Esfoliante para os Pés\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Pigmento Digital\",\n  \"produto\": \"Gel para Sobrancelhas\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Limpeza Profunda\",\n  \"produto\": \"Shampoo para Barba\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Pixel da Mata\",\n  \"produto\": \"Caneta Delineadora\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Alquimia da Beleza\",\n  \"produto\": \"Kit Spa Relaxante\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Código da Sedução\",\n  \"produto\": \"Tônico Facial Adstringente\"\n},\n{\n  \"marca\": \"Labirinto Verde\",\n  \"linha\": \"Caminhos da Floresta\",\n  \"produto\": \"Gloss Labial com Efeito Volume\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Jardim de Bits\",\n  \"produto\": \"Kit Spa para Mãos\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Algoritmo Natural\",\n  \"produto\": \"Condicionador\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Aurora Virtual\",\n  \"produto\": \"Condicionador para Pets\"\n},\n{\n  \"marca\": \"Jardim Encantado\",\n  \"linha\": \"Sonho Verde\",\n  \"produto\": \"Paleta de Sombras Neutras\"\n},\n{\n  \"marca\": \"Acessórios da Floresta\",\n  \"linha\": \"Esfoliação Natural\",\n  \"produto\": \"Escova de Banho\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Design Orgânico\",\n  \"produto\": \"Kit Spa para o Corpo\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Proteção Diária\",\n  \"produto\": \"Protetor Solar Facial\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Código da Sedução\",\n  \"produto\": \"Base Líquida Efeito Matte\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Jardim de Bits\",\n  \"produto\": \"Pó Compacto\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Orvalho Digital\",\n  \"produto\": \"Sérum Facial Anti-idade\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Toque Intuitivo\",\n  \"produto\": \"Pincel Kabuki\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Barba Impecável\",\n  \"produto\": \"Condicionador para Barba\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Espectro Cromático\",\n  \"produto\": \"Sérum para Área dos Olhos\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Bruma Leve\",\n  \"produto\": \"Lápis Delineador para Olhos\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Filtro Natural\",\n  \"produto\": \"Creme para Área dos Olhos\"\n},\n{\n  \"marca\": \"Aurora Boreal Amazônica\",\n  \"linha\": \"Noite Iluminada\",\n  \"produto\": \"Paleta de Sombras Nude\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Brisa Noturna\",\n  \"produto\": \"Kit de Pincéis para Rosto e Olhos\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Debug da Beleza\",\n  \"produto\": \"Leave-in\"\n},\n{\n  \"marca\": \"Harmonia Selvagem\",\n  \"linha\": \"Código Ancestral\",\n  \"produto\": \"Kit Hidratação Capilar\"\n},\n{\n  \"marca\": \"Alquimia Tropical\",\n  \"linha\": \"Transformação Natural\",\n  \"produto\": \"Pó Facial Matificante\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Beleza Binária\",\n  \"produto\": \"Delineador\"\n},\n{\n  \"marca\": \"Amazônia 4.0\",\n  \"linha\": \"Conexão Natural\",\n  \"produto\": \"Esponja de Maquiagem\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Pixel da Mata\",\n  \"produto\": \"Bronzeador em Spray\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Terra & Byte\",\n  \"produto\": \"Máscara Capilar Nutritiva\"\n},\n{\n  \"marca\": \"Pixel da Natureza\",\n  \"linha\": \"Texturas Reais\",\n  \"produto\": \"Kit Spa Facial\"\n},\n{\n  \"marca\": \"Acessórios da Floresta\",\n  \"linha\": \"Banho Natural\",\n  \"produto\": \"Kit Manicure\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Água & Código\",\n  \"produto\": \"Kit Pincel de Maquiagem\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Barba Impecável\",\n  \"produto\": \"Creme para Olhos\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Orvalho Digital\",\n  \"produto\": \"Sabonete\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Software da Sedução\",\n  \"produto\": \"Espuma de Banho\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Jardim de Bits\",\n  \"produto\": \"Bruma Facial Hidratante\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Camuflagem Digital\",\n  \"produto\": \"Tônico Facial Revitalizante\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Camuflagem Digital\",\n  \"produto\": \"Base em Pó Mineral\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Mistério Digital\",\n  \"produto\": \"Kit Maquiagem para Viagem\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Espectro Amazônico\",\n  \"produto\": \"Escova de Banho com Cabo Longo\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Brisa Noturna\",\n  \"produto\": \"Kit Cachos Definidos\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Aurora Virtual\",\n  \"produto\": \"Shampoo para Cabelos Coloridos\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Terra & Byte\",\n  \"produto\": \"Kit Maquiagem\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Bronze Perfeito\",\n  \"produto\": \"Bronzeador em Óleo\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Ícone da Beleza\",\n  \"produto\": \"Iluminador Líquido\"\n},\n{\n  \"marca\": \"Pelos Brilhantes\",\n  \"linha\": \"Aroma da Floresta\",\n  \"produto\": \"Hidratante Facial\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Barba de Lenhador\",\n  \"produto\": \"Kit Barba Completo\"\n},\n{\n  \"marca\": \"Jardim Encantado\",\n  \"linha\": \"Magia da Floresta\",\n  \"produto\": \"Iluminador em Bastão\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Bronze Perfeito\",\n  \"produto\": \"Esfoliante para as Mãos\"\n},\n{\n  \"marca\": \"Segredos do Rio\",\n  \"linha\": \"Espelho D'Água\",\n  \"produto\": \"Kit de Maquiagem Básico\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Toque Intuitivo\",\n  \"produto\": \"Bálsamo Labial Hidratante\"\n},\n{\n  \"marca\": \"Harmonia Selvagem\",\n  \"linha\": \"Equilíbrio Natural\",\n  \"produto\": \"Hidratante Corporal\"\n},\n{\n  \"marca\": \"Pixel da Natureza\",\n  \"linha\": \"Definição Perfeita\",\n  \"produto\": \"Sombra em Pó\"\n},\n{\n  \"marca\": \"Folhas de Código\",\n  \"linha\": \"Algoritmo Verde\",\n  \"produto\": \"Máscara Capilar Hidratante\"\n},\n{\n  \"marca\": \"Frutos do Algoritmo\",\n  \"linha\": \"Sabor da Inovação\",\n  \"produto\": \"Pó Facial Translúcido\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Proteção Total\",\n  \"produto\": \"Protetor Solar FPS 50\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Jardim de Bits\",\n  \"produto\": \"Base\"\n},\n{\n  \"marca\": \"Pelos Brilhantes\",\n  \"linha\": \"Patas Cheirosas\",\n  \"produto\": \"Spray Repelente para Pets\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Camuflagem Digital\",\n  \"produto\": \"Sombra Líquida\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Espectro Cromático\",\n  \"produto\": \"Caneta para Sobrancelhas\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Ícone da Beleza\",\n  \"produto\": \"Pincel para Delineador\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Alquimia da Beleza\",\n  \"produto\": \"Pente de Madeira\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Jardim de Bits\",\n  \"produto\": \"Máscara Facial de Argila\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Software da Sedução\",\n  \"produto\": \"Bálsamo Labial com Cor\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Debug da Beleza\",\n  \"produto\": \"Delineador Líquido\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Natureza Moderna\",\n  \"produto\": \"Batom Líquido\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Debug da Beleza\",\n  \"produto\": \"Kit Viagem\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Raiz & Código\",\n  \"produto\": \"Esmalte\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Proteção Total\",\n  \"produto\": \"Protetor Solar FPS 30\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Fórmula da Floresta\",\n  \"produto\": \"Gel Fixador para Sobrancelhas\"\n},\n{\n  \"marca\": \"Lua na Selva\",\n  \"linha\": \"Noite Mística\",\n  \"produto\": \"Gloss Labial Hidratante\"\n},\n{\n  \"marca\": \"Jardim Encantado\",\n  \"linha\": \"Encanto Natural\",\n  \"produto\": \"Kit de Maquiagem Completo\"\n},\n{\n  \"marca\": \"Alquimia Tropical\",\n  \"linha\": \"Elixires da Floresta\",\n  \"produto\": \"Sérum Facial Hidratante\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Design Orgânico\",\n  \"produto\": \"Kit Lábios\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Terra & Byte\",\n  \"produto\": \"Pincel para Pó Facial\"\n},\n{\n  \"marca\": \"Harmonia Selvagem\",\n  \"linha\": \"Código Ancestral\",\n  \"produto\": \"Óleo Corporal\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Bronze Perfeito\",\n  \"produto\": \"Bronzeador\"\n},\n{\n  \"marca\": \"Jardim Encantado\",\n  \"linha\": \"Sonho Verde\",\n  \"produto\": \"Protetor Solar Facial FPS 50\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Paleta de Bits\",\n  \"produto\": \"Batom\"\n},\n{\n  \"marca\": \"Pétalas Binárias\",\n  \"linha\": \"Jardim Virtual\",\n  \"produto\": \"Kit Spa para os Pés\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Algoritmo da Natureza\",\n  \"produto\": \"Finalizador Capilar\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Folhagem High-Tech\",\n  \"produto\": \"Esmalte com Efeito Gel\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Espectro Amazônico\",\n  \"produto\": \"Kit Pedicure\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Pigmentação Digital\",\n  \"produto\": \"Kit Banho Relaxante\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Ícone da Beleza\",\n  \"produto\": \"Kit Cuidados com a Pele Oleosa\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Folhagem High-Tech\",\n  \"produto\": \"Kit Unhas\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Pixel Floral\",\n  \"produto\": \"Óleo Capilar\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Camuflagem Digital\",\n  \"produto\": \"Batom em Bala\"\n},\n{\n  \"marca\": \"Acessórios da Floresta\",\n  \"linha\": \"Esfoliação Natural\",\n  \"produto\": \"Luva Esfoliante\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Algoritmo Natural\",\n  \"produto\": \"Shampoo\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Paleta de Bits\",\n  \"produto\": \"Primer Facial\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Chuva de Verão\",\n  \"produto\": \"Perfume\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Beleza Binária\",\n  \"produto\": \"Máscara Facial Esfoliante\"\n},\n{\n  \"marca\": \"Código da Cor\",\n  \"linha\": \"Pigmento Digital\",\n  \"produto\": \"Sérum Facial Clareador\"\n},\n{\n  \"marca\": \"Aromas da Amazônia\",\n  \"linha\": \"Névoa da Manhã\",\n  \"produto\": \"Difusor de Aromas\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Pixel da Mata\",\n  \"produto\": \"Protetor Solar FPS 15\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Renovação da Pele\",\n  \"produto\": \"Esfoliante Corporal\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Fórmula da Floresta\",\n  \"produto\": \"Delineador em Gel\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Névoa Encantada\",\n  \"produto\": \"Óleo Secante para Esmalte\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Camuflagem Digital\",\n  \"produto\": \"Lápis para Olhos\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Renovação da Pele\",\n  \"produto\": \"Esponja de Banho\"\n},\n{\n  \"marca\": \"Harmonia Selvagem\",\n  \"linha\": \"Equilíbrio Natural\",\n  \"produto\": \"Kit Crescimento Capilar\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Bruma Leve\",\n  \"produto\": \"Paleta de Sombras\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Algoritmo da Natureza\",\n  \"produto\": \"Colônia\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Fórmula da Perfeição\",\n  \"produto\": \"Sérum Facial\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Algoritmo Natural\",\n  \"produto\": \"Creme Hidratante Facial\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Chuva de Verão\",\n  \"produto\": \"Hidratante\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Alquimia da Beleza\",\n  \"produto\": \"Máscara Incolor para Sobrancelhas\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Frescor da Natureza\",\n  \"produto\": \"Sabonete Líquido\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Código da Beleza\",\n  \"produto\": \"Máscara Capilar\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Raiz & Código\",\n  \"produto\": \"Creme Contorno dos Olhos Anti-idade\"\n},\n{\n  \"marca\": \"Aromas da Amazônia\",\n  \"linha\": \"Floresta Mística\",\n  \"produto\": \"Aromatizador de Ambiente\"\n},\n{\n  \"marca\": \"Amazônia 4.0\",\n  \"linha\": \"Biotecnologia da Beleza\",\n  \"produto\": \"Base Fortalecedora para Unhas\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Algoritmo da Natureza\",\n  \"produto\": \"Pincel para Contorno\"\n},\n{\n  \"marca\": \"Aurora Boreal Amazônica\",\n  \"linha\": \"Cores Mágicas\",\n  \"produto\": \"Paleta de Sombras Multifuncional\"\n},\n{\n  \"marca\": \"Lua na Selva\",\n  \"linha\": \"Clarão Lunar\",\n  \"produto\": \"Shampoo para Cabelos Secos\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Filtro Natural\",\n  \"produto\": \"Sombra\"\n},\n{\n  \"marca\": \"Folhas de Código\",\n  \"linha\": \"Algoritmo Verde\",\n  \"produto\": \"Base Líquida Matte\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Fogo & Pixel\",\n  \"produto\": \"Primer Facial Iluminador\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Paleta Virtual\",\n  \"produto\": \"Blush em Creme\"\n},\n{\n  \"marca\": \"Frutos do Algoritmo\",\n  \"linha\": \"Código Nutritivo\",\n  \"produto\": \"Batom Cremoso Hidratante\"\n},\n{\n  \"marca\": \"Aromas da Amazônia\",\n  \"linha\": \"Floresta Mística\",\n  \"produto\": \"Sabonete Facial\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Orvalho Digital\",\n  \"produto\": \"Kit Cuidados com a Pele\"\n},\n{\n  \"marca\": \"Selva de Pixels\",\n  \"linha\": \"Filtro Natural\",\n  \"produto\": \"Kit Viagem para Cabelos Cacheados\"\n},\n{\n  \"marca\": \"Aurora Boreal Amazônica\",\n  \"linha\": \"Noite Iluminada\",\n  \"produto\": \"Batom Cremoso\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Água & Código\",\n  \"produto\": \"Loção Corporal Hidratante\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Toque Intuitivo\",\n  \"produto\": \"Sérum Facial Antioxidante\"\n},\n{\n  \"marca\": \"Aromas da Amazônia\",\n  \"linha\": \"Floresta Mística\",\n  \"produto\": \"Vela Aromática\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Limpeza Profunda\",\n  \"produto\": \"Sabonete Esfoliante para Barba\"\n},\n{\n  \"marca\": \"Pétalas Binárias\",\n  \"linha\": \"Flores Digitais\",\n  \"produto\": \"BB Cream\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Fórmula da Perfeição\",\n  \"produto\": \"Apontador Duplo para Lápis de Olhos e Sobrancelhas\"\n},\n{\n  \"marca\": \"Pixel da Natureza\",\n  \"linha\": \"Cores Vivas\",\n  \"produto\": \"Blush em Pó\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Folhagem High-Tech\",\n  \"produto\": \"Removedor de Esmalte\"\n},\n{\n  \"marca\": \"Jardim Encantado\",\n  \"linha\": \"Sonho Verde\",\n  \"produto\": \"Kit Matizador para Cabelos Loiros\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Momento Relax\",\n  \"produto\": \"Kit Cuidados com o Corpo\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Software da Sedução\",\n  \"produto\": \"Pincel para Blush\"\n},\n{\n  \"marca\": \"Folhas de Código\",\n  \"linha\": \"Linguagem da Natureza\",\n  \"produto\": \"Kit de Pincéis para Olhos\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Natureza Moderna\",\n  \"produto\": \"Shampoo para Cabelos Normais\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Beleza Binária\",\n  \"produto\": \"Kit Cuidados com o Rosto para Pele Seca\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Fogo & Pixel\",\n  \"produto\": \"Sombra em Pó Compacta\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Fórmula da Perfeição\",\n  \"produto\": \"Shampoo Revitalizante\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Fórmula da Perfeição\",\n  \"produto\": \"Condicionador Revitalizante\"\n},\n{\n  \"marca\": \"Lua na Selva\",\n  \"linha\": \"Noite Mística\",\n  \"produto\": \"Kit Cuidados com a Pele Mista\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Fórmula da Perfeição\",\n  \"produto\": \"Kit Cuidados para Pele Madura\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Código Selvagem\",\n  \"produto\": \"Condicionador Anticaspa\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Software da Sedução\",\n  \"produto\": \"Tônico Capilar\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Pixel da Mata\",\n  \"produto\": \"Máscara para Cílios Volume e Alongamento\"\n},\n{\n  \"marca\": \"Folhas de Código\",\n  \"linha\": \"Linguagem da Natureza\",\n  \"produto\": \"Kit Manicure e Pedicure\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Pixel Floral\",\n  \"produto\": \"Base Líquida\"\n},\n{\n  \"marca\": \"Cores em Bytes\",\n  \"linha\": \"Pigmentação Digital\",\n  \"produto\": \"Kit Spa para Mãos e Pés\"\n},\n{\n  \"marca\": \"Amazônia 4.0\",\n  \"linha\": \"Biotecnologia da Beleza\",\n  \"produto\": \"Kit de Pincéis para Maquiagem\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Software da Sedução\",\n  \"produto\": \"Paleta de Contorno\"\n},\n{\n  \"marca\": \"Labirinto Verde\",\n  \"linha\": \"Descobertas Naturais\",\n  \"produto\": \"CC Cream\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Aurora Virtual\",\n  \"produto\": \"Shampoo para Pets\"\n},\n{\n  \"marca\": \"Alquimia Tropical\",\n  \"linha\": \"Poções Mágicas\",\n  \"produto\": \"Kit Reconstrução Capilar\"\n},\n{\n  \"marca\": \"Folhas de Código\",\n  \"linha\": \"Algoritmo Verde\",\n  \"produto\": \"Kit Cuidados para Pele Normal a Seca\"\n},\n{\n  \"marca\": \"Algoritmo Botânico\",\n  \"linha\": \"Beleza Binária\",\n  \"produto\": \"Kit Cuidados para Pele Sensível\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Orvalho Digital\",\n  \"produto\": \"Kit Reparador de Pontas\"\n},\n{\n  \"marca\": \"Aromas da Amazônia\",\n  \"linha\": \"Névoa da Manhã\",\n  \"produto\": \"Sabonete em Barra\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Fogo & Pixel\",\n  \"produto\": \"Protetor Solar Facial FPS 30\"\n},\n{\n  \"marca\": \"Águas da Mata\",\n  \"linha\": \"Brisa Noturna\",\n  \"produto\": \"Kit Maquiagem Completo\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Relaxamento Profundo\",\n  \"produto\": \"Óleo de Massagem\"\n},\n{\n  \"marca\": \"Essência do Código\",\n  \"linha\": \"Fórmula da Perfeição\",\n  \"produto\": \"Escova de Cabelo\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Momento Relax\",\n  \"produto\": \"Kit Spa em Casa\"\n},\n{\n  \"marca\": \"Alquimia Tropical\",\n  \"linha\": \"Poções Mágicas\",\n  \"produto\": \"Iluminador em Pó\"\n},\n{\n  \"marca\": \"Bioma Digital\",\n  \"linha\": \"Pixel da Mata\",\n  \"produto\": \"Sérum Facial Vitamina C\"\n},\n{\n  \"marca\": \"Sol da Floresta\",\n  \"linha\": \"Proteção Diária\",\n  \"produto\": \"Creme para as Mãos\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Momento Relax\",\n  \"produto\": \"Sabonete Esfoliante Corporal\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Barba de Lenhador\",\n  \"produto\": \"Kit Pós-Barba\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Algoritmo Natural\",\n  \"produto\": \"Kit Cuidados para Pele Oleosa\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Raiz & Código\",\n  \"produto\": \"Blush Cremoso\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Terra & Byte\",\n  \"produto\": \"Máscara para Cílios à Prova D'água\"\n},\n{\n  \"marca\": \"Interface Natural\",\n  \"linha\": \"Ícone da Beleza\",\n  \"produto\": \"Máscara para Olhos Relaxante\"\n},\n{\n  \"marca\": \"Folhas de Código\",\n  \"linha\": \"Linguagem da Natureza\",\n  \"produto\": \"Batom Matte\"\n},\n{\n  \"marca\": \"Amazônia 4.0\",\n  \"linha\": \"Biotecnologia da Beleza\",\n  \"produto\": \"Kit Cuidados para Pele Acneica\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Barba Impecável\",\n  \"produto\": \"Balm para Barba\"\n},\n{\n  \"marca\": \"Lua na Selva\",\n  \"linha\": \"Clarão Lunar\",\n  \"produto\": \"Condicionador para Cabelos Secos\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Raiz & Código\",\n  \"produto\": \"Batom Líquido Matte\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Barba de Lenhador\",\n  \"produto\": \"Loção Corporal Iluminadora\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Folhagem High-Tech\",\n  \"produto\": \"Kit Cuidados para Pele Mista\"\n},\n{\n  \"marca\": \"Flores de Neon\",\n  \"linha\": \"Jardim de Bits\",\n  \"produto\": \"Corretivo\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Código da Beleza\",\n  \"produto\": \"Kit Antifrizz\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Raiz & Código\",\n  \"produto\": \"Kit Cuidados para Pele Seca\"\n},\n{\n  \"marca\": \"Nuvem da Floresta\",\n  \"linha\": \"Bruma Leve\",\n  \"produto\": \"Shampoo Anticaspa\"\n},\n{\n  \"marca\": \"Raios de Sol Digital\",\n  \"linha\": \"Energia Solar\",\n  \"produto\": \"Esmalte com Brilho\"\n},\n{\n  \"marca\": \"Segredos do Rio\",\n  \"linha\": \"Profundezas Misteriosas\",\n  \"produto\": \"Gloss Labial com Glitter\"\n},\n{\n  \"marca\": \"Pixel da Natureza\",\n  \"linha\": \"Cores Vivas\",\n  \"produto\": \"Kit Brilho Intenso\"\n},\n{\n  \"marca\": \"Aurora Boreal Amazônica\",\n  \"linha\": \"Brilho Estelar\",\n  \"produto\": \"Kit Pincel de Maquiagem Profissional\"\n},\n{\n  \"marca\": \"Raízes Digitais\",\n  \"linha\": \"Florescimento Digital\",\n  \"produto\": \"Kit de Pincéis para Rosto\"\n},\n{\n  \"marca\": \"Elementos Nativos\",\n  \"linha\": \"Água & Código\",\n  \"produto\": \"Creme para Pentear\"\n},\n{\n  \"marca\": \"Toque da Floresta\",\n  \"linha\": \"Frescor da Natureza\",\n  \"produto\": \"Esfoliante Labial\"\n},\n{\n  \"marca\": \"Barba da Floresta\",\n  \"linha\": \"Limpeza Profunda\",\n  \"produto\": \"Máscara para Olhos\"\n},\n{\n  \"marca\": \"Floresta de Estilo\",\n  \"linha\": \"Natureza Moderna\",\n  \"produto\": \"Condicionador para Cabelos Normais\"\n}]\n\n\n<REGRAS-DE-NEGOCIO>\n* Dúvidas gerais sobre o negócio: \n- horário de atendimento: 8h a 18h; \n- custo de delivery: R$ 5.00; \n- problemas com produtos (produto danificado, alergias etc.) ou entregas (atraso, entrega incompleta); reclamações; devoluções; reembolso; cadastro;: deve-se dizer para \"aguardar um momento\" e que o cliente será encaminhado para o gerente.\n* Quaisquer outros tipos de dúvidas não explicitadas: deve-se dizer para \"aguardar um momento\" e que o cliente será encaminhado para o gerente.\n</REGRAS-DE-NEGOCIO>\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        688
+      ],
+      "id": "88f95c23-35b5-423a-b06d-c2c5abd04d79",
+      "name": "Seleciona Funcao"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"acao\": \"(1) Descrição da função 1\",\n    \"nome_cliente\": \"João da Silva e Sousa\",\n    \"produto\": \"Shampoo exótico de jabuticaba\",\n    \"marca\": \"Raízes Digitais\",\n    \"linha\": \"Algoritmo Natural\",\n    \"categoria\": [\"perfumaria\", \"cuidados para pele\"],\n    \"ciclo\": 4,\n    \"ano\": \"2025\",\n    \"mes\": \"04\",\n    \"dia\": \"30\",\n    \"questionamento\": \"tenho uma duvida sobre o horario de que a loja fica aberta, uma reclamação sobre um produto danificado e quero devolvê-lo\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        944
+      ],
+      "id": "0b5ee555-eb29-4efb-9b06-7710e17e0acd",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "content": "# TEMPO DE ESPERRA",
+        "height": 480,
+        "width": 630,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -160,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "071acc2c-3872-4cc2-b9f0-cd45a15231fa",
+      "name": "TEMPO DE ESPERA"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "wait-time",
+        "key": "wait-time",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        80,
+        176
+      ],
+      "id": "90592a01-0395-46c2-b4e8-c4ad2d9ee128",
+      "name": "check wait-time",
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        1216
+      ],
+      "id": "ed5b6c23-68fa-4e53-a343-35fab7944c55",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "7OPa2nwcEX2iD3FI",
+          "name": "Evol_Gemini(PaLM)1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// O método correto para obter todos os itens do nó anterior é $input.all()\n// Vamos usar o $input.all() e assumir que ele está retornando a lista original\n// Se o nó anterior retorna a lista completa (o array de objetos)\nconst inputData = $input.all(); \n\nconst categoriasGeraisUnicas = new Set();\n\n// 1. Processar a lista para extrair apenas nomeCatGeral e remover duplicatas\nif (Array.isArray(inputData)) {\n    for (const item of inputData) {\n        if (item.json && item.json.nomeCatGeral) {\n            let nome = item.json.nomeCatGeral.trim();\n            // Capitaliza a primeira letra de cada palavra e garante lowercase no resto (para apresentação)\n            nome = nome.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');\n            categoriasGeraisUnicas.add(nome);\n        }\n    }\n} else {\n    // Se $input.all() não retornou o array esperado, vamos tentar a simulação\n    // Normalmente, esta seção seria removida em produção no n8n.\n    // Usaremos a simulação local para garantir que a lógica funciona:\n    for (const item of listaDeCategorias) {\n        if (item.nomeCatGeral) {\n            let nome = item.nomeCatGeral.trim();\n            nome = nome.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');\n            categoriasGeraisUnicas.add(nome);\n        }\n    }\n}\n\n// 2. Formatar a string de saída\nconst stringFormatada = Array.from(categoriasGeraisUnicas).join('; ');\n\n// 3. Retornar a string encapsulada no formato n8n\nreturn [{\n    json: {\n        categorias_gerais_unicas: stringFormatada\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        1056
+      ],
+      "id": "862a11d6-c1cb-4b2c-8e43-8205ecf6788a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "twilio_number",
+        "value": "={{ $json[\"twilio_number\"] }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        688
+      ],
+      "id": "486a2e87-6f50-45e8-ab41-be73946ea3e6",
+      "name": "Set Twilio Number",
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Números Permitidos",
+        "height": 208,
+        "width": 198,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -816,
+        656
+      ],
+      "typeVersion": 1,
+      "id": "5a554d4c-b21b-442f-9053-a29867f9fd8b",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "zap_number",
+        "value": "={{ $json.number }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        688
+      ],
+      "id": "1629f810-d75d-474e-9595-ecc7c301d89e",
+      "name": "Set Number",
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e713e280-5189-4b16-8ec1-672f8dd46442",
+              "name": "contactName",
+              "value": "={{ $json.body.ProfileName }}",
+              "type": "string"
+            },
+            {
+              "id": "0e6f6fe4-9269-4e99-a32c-300dfd8c6ecd",
+              "name": "number",
+              "value": "={{ $json.body.From }}",
+              "type": "string"
+            },
+            {
+              "id": "f4e01dfd-992b-4760-b253-797f8fcc2a79",
+              "name": "twilio_number",
+              "value": "={{ $json.body.To }}",
+              "type": "string"
+            },
+            {
+              "id": "5c71b4fd-5961-4124-ba24-9f8a847e868b",
+              "name": "text",
+              "value": "={{ $json.body.Body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -992,
+        704
+      ],
+      "id": "671f6639-e8a2-43eb-978c-d4c8bc896fcd",
+      "name": "Dados-cliente"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ `mensagens-${$('Set Number').item.json.number}` }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        896,
+        832
+      ],
+      "id": "03163663-7fe6-4f0d-a91c-6fe1e1a3671c",
+      "name": "Redis",
+      "credentials": {
+        "redis": {
+          "id": "KZOcaY3BmxTxMxUL",
+          "name": "Evol-Redis1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "={{ $('Webhook Twilio').item.json.body.To }}",
+        "to": "={{ $('Webhook Twilio').item.json.body.From }}",
+        "message": "=Atendimento finalizado!\nSe precisar de algo mais, pode chamar!😄",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        832
+      ],
+      "id": "e5d33c4b-6ab5-4dbb-b638-f19c1d17fa65",
+      "name": "Send an SMS/MMS/WhatsApp message2",
+      "credentials": {
+        "twilioApi": {
+          "id": "KDMLpntrZ3ERQmzY",
+          "name": "Twilio Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfc36d76-9372-4cb5-94e3-504d9f033f32",
+              "name": "output.acao",
+              "value": "={{ $json.output.acao }}",
+              "type": "string"
+            },
+            {
+              "id": "7264d819-d000-4c8c-8b6b-f0a2997d4755",
+              "name": "output.nome_cliente",
+              "value": "={{ $json.output.nome_cliente }}",
+              "type": "string"
+            },
+            {
+              "id": "298aacfb-0992-4570-abfe-621835e1e471",
+              "name": "output.produto",
+              "value": "={{ $json.output.produto }}",
+              "type": "string"
+            },
+            {
+              "id": "73459cba-e5da-40fd-b7bd-2374ab572133",
+              "name": "output.categoria",
+              "value": "={{ $json.output.categoria }}",
+              "type": "array"
+            },
+            {
+              "id": "5cb6b64f-9f79-47dc-b119-2ddcb44c98a6",
+              "name": "output.ciclo",
+              "value": "={{ $json.output.ciclo }}",
+              "type": "number"
+            },
+            {
+              "id": "77b48087-6b5d-4faf-aac4-7f9dec187cfd",
+              "name": "output.ano",
+              "value": "={{ ($json.output.ano == '' && $json.output.ciclo == 0)? Date().toDateTime().format('yyyy') : $json.output.ano}}",
+              "type": "string"
+            },
+            {
+              "id": "ec2545e2-008e-481b-b266-5eef730e5ab6",
+              "name": "output.mes",
+              "value": "={{ ($json.output.mes == '' && $json.output.ciclo == 0)? Date().toDateTime().format('MM') : $json.output.mes}}",
+              "type": "string"
+            },
+            {
+              "id": "9bb0ae18-92fd-48f0-a5b4-37c326b3b895",
+              "name": "output.dia",
+              "value": "={{ ($json.output.dia == '' && $json.output.ciclo == 0)? Date().toDateTime().format('dd') : $json.output.dia}}",
+              "type": "string"
+            },
+            {
+              "id": "1769b510-aaea-4575-b3db-6b8445e475c7",
+              "name": "output.questionamento",
+              "value": "={{ $json.output.questionamento }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        1232
+      ],
+      "id": "1d325e3f-9b53-42e3-8d27-f920e45b7ba5",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfc36d76-9372-4cb5-94e3-504d9f033f32",
+              "name": "output.acao",
+              "value": "={{ $json.output.acao }}",
+              "type": "string"
+            },
+            {
+              "id": "7264d819-d000-4c8c-8b6b-f0a2997d4755",
+              "name": "output.nome_cliente",
+              "value": "={{ $json.output.nome_cliente }}",
+              "type": "string"
+            },
+            {
+              "id": "298aacfb-0992-4570-abfe-621835e1e471",
+              "name": "output.produto",
+              "value": "={{ $json.output.produto }}",
+              "type": "string"
+            },
+            {
+              "id": "73459cba-e5da-40fd-b7bd-2374ab572133",
+              "name": "output.categoria",
+              "value": "={{ $json.output.categoria }}",
+              "type": "array"
+            },
+            {
+              "id": "5cb6b64f-9f79-47dc-b119-2ddcb44c98a6",
+              "name": "output.ciclo",
+              "value": "={{ $json.output.ciclo }}",
+              "type": "number"
+            },
+            {
+              "id": "77b48087-6b5d-4faf-aac4-7f9dec187cfd",
+              "name": "output.ano",
+              "value": "={{ ($json.output.ano == '' && $json.output.ciclo == 0)? Date().toDateTime().format('yyyy') : $json.output.ano}}",
+              "type": "string"
+            },
+            {
+              "id": "ec2545e2-008e-481b-b266-5eef730e5ab6",
+              "name": "output.mes",
+              "value": "={{ ($json.output.mes == '' && $json.output.ciclo == 0)? Date().toDateTime().format('MM') : $json.output.mes}}",
+              "type": "string"
+            },
+            {
+              "id": "9bb0ae18-92fd-48f0-a5b4-37c326b3b895",
+              "name": "output.dia",
+              "value": "={{ ($json.output.dia == '' && $json.output.ciclo == 0)? Date().toDateTime().format('dd') : $json.output.dia}}",
+              "type": "string"
+            },
+            {
+              "id": "1769b510-aaea-4575-b3db-6b8445e475c7",
+              "name": "output.questionamento",
+              "value": "={{ $json.output.questionamento }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        1424
+      ],
+      "id": "aa119ea7-bc8c-4fb7-99ea-3b71bdc05835",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfc36d76-9372-4cb5-94e3-504d9f033f32",
+              "name": "output.acao",
+              "value": "={{ $json.output.acao }}",
+              "type": "string"
+            },
+            {
+              "id": "7264d819-d000-4c8c-8b6b-f0a2997d4755",
+              "name": "output.nome_cliente",
+              "value": "={{ $json.output.nome_cliente }}",
+              "type": "string"
+            },
+            {
+              "id": "298aacfb-0992-4570-abfe-621835e1e471",
+              "name": "output.produto",
+              "value": "={{ $json.output.produto }}",
+              "type": "string"
+            },
+            {
+              "id": "3b12efe4-8909-45f9-97cf-f341edb5f464",
+              "name": "output.marca",
+              "value": "={{ $json.output.marca }}",
+              "type": "string"
+            },
+            {
+              "id": "a342822e-ff95-4fd0-b2f1-8f16c4630a50",
+              "name": "output.linha",
+              "value": "={{ $json.output.linha }}",
+              "type": "string"
+            },
+            {
+              "id": "73459cba-e5da-40fd-b7bd-2374ab572133",
+              "name": "output.categoria",
+              "value": "={{ $json.output.categoria }}",
+              "type": "array"
+            },
+            {
+              "id": "5cb6b64f-9f79-47dc-b119-2ddcb44c98a6",
+              "name": "output.ciclo",
+              "value": "={{ $json.output.ciclo }}",
+              "type": "number"
+            },
+            {
+              "id": "77b48087-6b5d-4faf-aac4-7f9dec187cfd",
+              "name": "output.ano",
+              "value": "={{ ($json.output.ano == '' && $json.output.ciclo == 0)? Date().toDateTime().format('yyyy') : $json.output.ano}}",
+              "type": "string"
+            },
+            {
+              "id": "ec2545e2-008e-481b-b266-5eef730e5ab6",
+              "name": "output.mes",
+              "value": "={{ ($json.output.mes == '' && $json.output.ciclo == 0)? Date().toDateTime().format('MM') : $json.output.mes}}",
+              "type": "string"
+            },
+            {
+              "id": "9bb0ae18-92fd-48f0-a5b4-37c326b3b895",
+              "name": "output.dia",
+              "value": "={{ ($json.output.dia == '' && $json.output.ciclo == 0)? Date().toDateTime().format('dd') : $json.output.dia}}",
+              "type": "string"
+            },
+            {
+              "id": "1769b510-aaea-4575-b3db-6b8445e475c7",
+              "name": "output.questionamento",
+              "value": "={{ $json.output.questionamento }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        1600
+      ],
+      "id": "9ca41b1b-43eb-4420-92de-d56d6aafc9d3",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sistd-api-backend:3002/aggregate",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "collection",
+              "value": "=Ciclo"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  { \n    \"$match\": {\n      {{ ($json.output.ciclo != 0)? \n      `\"numero\": ${$json.output.ciclo}`\n      : \n      `\n      \"$and\": [\n        { \"dataInicio\": {\"$lte\": \"${$json.output.ano}-${$json.output.mes}-${$json.output.dia}T00:00:00.000Z\" } },\n        { \"dataFim\": {\"$gte\": \"${$json.output.ano}-${$json.output.mes}-${$json.output.dia}T00:00:00.000Z\"} }\n      ]\n      ` \n      }}\n      \n    }\n  },\n  { \"$unwind\": \"$produtos\" },\n  { \"$match\": {\"produtos.taxaDesconto\": {\"$gt\": 0} } },\n  { \n    \"$lookup\": {\n      \"from\": \"Produto\",\n      \"localField\": \"produtos.idProduto\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosProd\"\n    }\n  },\n  { \"$unwind\": \"$infosProd\" },\n  { \"$addFields\": {\n    \"infosProd.taxaDesconto\": \"$produtos.taxaDesconto\"\n  }},\n  \n  { \"$replaceRoot\": { \"newRoot\": \"$infosProd\" } },\n  { \n    \"$lookup\": {\n      \"from\": \"Categoria\",\n      \"localField\": \"categorias\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosCat\"\n    }\n  },\n  {\n    \"$addFields\": {\n      \"categorias\": {\n        \"$map\": {\n          \"input\": \"$infosCat\",\n          \"as\": \"cat\",\n          \"in\": {\n            \"$cond\": {\n              \"if\": { \"$ifNull\": [\"$$cat.nomeCatEspecifica\", false] },\n              \"then\": {\n                \"$concat\": [\n                  \"$$cat.nomeCatGeral\",\n                  \" > \",\n                  \"$$cat.nomeCatEspecifica\"\n                ]\n              },\n              \"else\": \"$$cat.nomeCatGeral\"\n            }\n          }\n        }\n      }\n    }\n  },\n  {\n    \"$project\": {\n      \"infosCat\": 0\n    }\n  }\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        1424
+      ],
+      "id": "72d7e4ba-3450-4343-9b0d-056699a21aed",
+      "name": "Produtos-Promo"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sistd-api-backend:3002/aggregate",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "collection",
+              "value": "=Ciclo"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  { \n    \"$match\": {\n      {{ ($json.output.ciclo != 0)? \n      `\"numero\": ${$json.output.ciclo}`\n      : \n      `\n      \"$and\": [\n        { \"dataInicio\": {\"$lte\": \"${$json.output.ano}-${$json.output.mes}-${$json.output.dia}T00:00:00.000Z\" } },\n        { \"dataFim\": {\"$gte\": \"${$json.output.ano}-${$json.output.mes}-${$json.output.dia}T00:00:00.000Z\"} }\n      ]\n      ` \n      }}\n      \n    }\n  },\n  { \"$unwind\": \"$produtos\" },\n  { \n    \"$lookup\": {\n      \"from\": \"Produto\",\n      \"localField\": \"produtos.idProduto\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosProd\"\n    }\n  },\n  { \"$unwind\": \"$infosProd\" },\n  { \"$addFields\": {\n    \"infosProd.taxaDesconto\": \"$produtos.taxaDesconto\"\n  }},\n  \n  { \"$replaceRoot\": { \"newRoot\": \"$infosProd\" } },\n  { \n    \"$lookup\": {\n      \"from\": \"Categoria\",\n      \"localField\": \"categorias\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosCat\"\n    }\n  },\n  {\n    \"$addFields\": {\n      \"categorias\": {\n        \"$map\": {\n          \"input\": \"$infosCat\",\n          \"as\": \"cat\",\n          \"in\": {\n            \"$cond\": {\n              \"if\": { \"$ifNull\": [\"$$cat.nomeCatEspecifica\", false] },\n              \"then\": {\n                \"$concat\": [\n                  \"$$cat.nomeCatGeral\",\n                  \" > \",\n                  \"$$cat.nomeCatEspecifica\"\n                ]\n              },\n              \"else\": \"$$cat.nomeCatGeral\"\n            }\n          }\n        }\n      }\n    }\n  },\n  {\n    \"$project\": {\n      \"infosCat\": 0\n    }\n  }\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        1232
+      ],
+      "id": "b60e4234-a2b8-43f3-9005-b9f8d7daf648",
+      "name": "Produtos-Ciclo-Atual"
+    },
+    {
+      "parameters": {
+        "collection": "Categoria",
+        "options": {
+          "limit": 40
+        }
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        1056
+      ],
+      "id": "e689f980-4ea8-4266-9779-e348408b7d7d",
+      "name": "Todas-Categorias",
+      "credentials": {
+        "mongoDb": {
+          "id": "4PFlQTLNIaP3qBWZ",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sistd-api-backend:3002/aggregate",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "collection",
+              "value": "=Produto"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  { \n    \"$match\": {\n      {{ ($json.output.marca == \"\") ? \"\" : `\"marca\": \"${$json.output.marca}\",` }}\n      {{ ($json.output.linha == \"\") ? \"\" : `\"linha\": \"${$json.output.linha}\",` }}\n      \"nome\": {\n        $regex: \"{{ $json.output.produto }}\",\n        $options: \"i\" \n      }\n    }\n  },\n  { \n    \"$lookup\": {\n      \"from\": \"Categoria\",\n      \"localField\": \"categorias\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosCat\"\n    }\n  },\n  {\n    \"$addFields\": {\n      \"categorias\": {\n        \"$map\": {\n          \"input\": \"$infosCat\",\n          \"as\": \"cat\",\n          \"in\": {\n            \"$cond\": {\n              \"if\": { \"$ifNull\": [\"$$cat.nomeCatEspecifica\", false] },\n              \"then\": {\n                \"$concat\": [\n                  \"$$cat.nomeCatGeral\",\n                  \" > \",\n                  \"$$cat.nomeCatEspecifica\"\n                ]\n              },\n              \"else\": \"$$cat.nomeCatGeral\"\n            }\n          }\n        }\n      }\n    }\n  },\n  {\n    \"$project\": {\n      \"infosCat\": 0\n    }\n  }\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        1600
+      ],
+      "id": "664c9eab-19d8-4688-a6e1-ebd86f9d3ba4",
+      "name": "Infos-Prod"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3969eb06-a2be-406e-917a-ad3de03b84c0",
+              "name": "infosProd",
+              "value": "={{ ($('Is-prod-in-promo').first().json.isEmpty() ) ? $('Infos-Prod').first().json : $('Is-prod-in-promo').first().json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        1600
+      ],
+      "id": "45db4039-0f23-450f-a439-d3f7058d9a79",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "content": "# Serviços / Atendimentos Padrões",
+        "height": 1024,
+        "width": 838,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        608,
+        752
+      ],
+      "typeVersion": 1,
+      "id": "808622fa-0233-4790-bb0d-f49c15853e60",
+      "name": "TEMPO DE ESPERA1"
+    },
+    {
+      "parameters": {
+        "content": "# Seletor de Serviços/Ações/Funções",
+        "height": 656,
+        "width": 678,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        608
+      ],
+      "typeVersion": 1,
+      "id": "bb3984dd-4d7f-400c-a1b7-8ca6d4117f18",
+      "name": "TEMPO DE ESPERA2"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ef80790b-72d8-4473-b617-008337bef1f0",
+                    "leftValue": "={{ $('Seleciona Funcao').item.json.output.acao.toLowerCase() }}",
+                    "rightValue": "finalizar o atendimento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Seleciona Funcao').item.json.output.acao.toLowerCase() }}",
+                    "rightValue": "questionamentos gerais",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "aa16b57f-1252-4464-b3ea-46dbd1bb1ddb"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a5b83074-6e4e-4b46-816c-6fb3046fb164",
+                    "leftValue": "={{ $('Seleciona Funcao').item.json.output.acao.toLowerCase() }}",
+                    "rightValue": "consultar categorias",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7fbffdca-59c1-412a-b392-80c52a1e054c",
+                    "leftValue": "={{ $('Seleciona Funcao').item.json.output.acao.toLowerCase() }}",
+                    "rightValue": "consultar produtos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "82dafcf1-3bf5-4975-bd0b-3f7918bf3047",
+                    "leftValue": "={{ $('Seleciona Funcao').item.json.output.acao.toLowerCase() }}",
+                    "rightValue": "consultar promocoes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5e320afa-d90d-4fab-94e7-06aea62f3845",
+                    "leftValue": "={{ $('Seleciona Funcao').item.json.output.acao.toLowerCase() }}",
+                    "rightValue": "saber mais informacoes sobre um produto especifico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        288,
+        976
+      ],
+      "id": "964fbd9a-819d-40c3-b854-6ea12539fc67",
+      "name": "Roteador"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5922557b-71e7-4390-af21-10b683e7a875",
+                    "leftValue": "={{ $json.number }}",
+                    "rightValue": "whatsapp:+559391805408",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Numero pessoal"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "9865cb5b-33da-490c-afc3-186457d5b564",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notStartsWith"
+                    },
+                    "leftValue": "={{ $json.number }}",
+                    "rightValue": "whatsapp:+559391805408"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rota normal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0dd242c-72b6-45b2-b267-5e9798e54bad",
+      "name": "Numeros-Permitidos",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -768,
+        704
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sistd-api-backend:3002/aggregate",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "collection",
+              "value": "=Ciclo"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  { \n    \"$match\": {\n      {{ ($('Edit Fields2').first().json.output.ciclo != 0)? \n      `\"numero\": ${$('Edit Fields2').first().json.output.ciclo}`\n      : \n      `\n      \"$and\": [\n        { \"dataInicio\": {\"$lte\": \"${$('Edit Fields2').first().json.output.ano}-${$('Edit Fields2').first().json.output.mes}-${$('Edit Fields2').first().json.output.dia}T00:00:00.000Z\" } },\n        { \"dataFim\": {\"$gte\": \"${$('Edit Fields2').first().json.output.ano}-${$('Edit Fields2').first().json.output.mes}-${$('Edit Fields2').first().json.output.dia}T00:00:00.000Z\"} }\n      ]\n      ` \n      }}\n    }\n  },\n  { \"$unwind\": \"$produtos\" },\n  { \"$match\": {\n    \"produtos.taxaDesconto\": {\"$gt\": 0},\n    \"$expr\": {\n      \"$in\": [\n        \"$produtos.idProduto\",\n        [{{ $('Infos-Prod').all().map(item => '{\"$toObjectId\": \"' + item.json._id + '\"}') }}]\n      ]\n    }\n  } },\n  { \n    \"$lookup\": {\n      \"from\": \"Produto\",\n      \"localField\": \"produtos.idProduto\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosProd\"\n    }\n  },\n  { \"$unwind\": \"$infosProd\" },\n  { \"$addFields\": {\n    \"infosProd.taxaDesconto\": \"$produtos.taxaDesconto\"\n  }},\n  \n  { \"$replaceRoot\": { \"newRoot\": \"$infosProd\" } },\n  { \n    \"$lookup\": {\n      \"from\": \"Categoria\",\n      \"localField\": \"categorias\",\n      \"foreignField\": \"_id\",\n      \"as\": \"infosCat\"\n    }\n  },\n  {\n    \"$addFields\": {\n      \"categorias\": {\n        \"$map\": {\n          \"input\": \"$infosCat\",\n          \"as\": \"cat\",\n          \"in\": {\n            \"$cond\": {\n              \"if\": { \"$ifNull\": [\"$$cat.nomeCatEspecifica\", false] },\n              \"then\": {\n                \"$concat\": [\n                  \"$$cat.nomeCatGeral\",\n                  \" > \",\n                  \"$$cat.nomeCatEspecifica\"\n                ]\n              },\n              \"else\": \"$$cat.nomeCatGeral\"\n            }\n          }\n        }\n      }\n    }\n  },\n  {\n    \"$project\": {\n      \"infosCat\": 0\n    }\n  }\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        1600
+      ],
+      "id": "d388963d-9cf5-47e0-aaa0-e8beefcfd36f",
+      "name": "Is-prod-in-promo",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "content": "# Formatador de Resposta",
+        "height": 480,
+        "width": 438,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1520,
+        912
+      ],
+      "typeVersion": 1,
+      "id": "df731a86-10dd-4d32-8a36-a1e1916bf3d0",
+      "name": "TEMPO DE ESPERA3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Dados brutos da API a serem formatados para o usuário: \n\n<DADOS-RECUPERADOS>\n{{ JSON.stringify($input.all()) }}\n</DADOS-RECUPERADOS>\n\n<PEDIDO-USUÁRIO>\n{{ $('Dados-cliente').first().json.text }}\n</PEDIDO-USUÁRIO>\n\n<HISTORICO-ANTERIOR-USUARIO>\n{{ JSON.stringify($('Pega Msg Acumuladas').first().json.mensagens) }}\n</HISTORICO-ANTERIOR-USUARIO>\nOBS: O primeiro item do array do histórico (mais à esquerda) é a mensagem mais recente e a última (mais à direita) é a mais antiga.",
+        "options": {
+          "systemMessage": "=Você é um atendente de WhatsApp que tira dúvidas de clientes sobre o negócio \"CodeParfum\", uma loja de perfumaria e cosméticos em geral. Responda ele de forma vendedora, mas ao mesmo tempo de forma bem breve, sem muita enrolação.\n\nPara tanto, você precisará formatar os <DADOS-RECUPERADOS> de uma forma estruturada e fácil de ler, conforme o <PEDIDO-USUARIO>. Admita que se o campo \"taxaDesconto\" não vier entre as informações do produto, é porque ele não está em promoção (preço integral) no ciclo considerado.\n\nCRÍTICO: Você não pode ultrapassar 1700 caracteres em sua resposta.\nOBS: Você não recebe informações de estoque, você é um assistente de catálogo. O campo \"qtd\" se refere a quantificação da \"unidadeMedida\" que o produto possui.\n\n\n====================\n(1) questionamentos gerais\n-> DADOS NECESSÁRIOS POSSÍVEIS:\n* Nenhum\n-> CARACTERÍSTICAS DESTA CATEGORIA (TIPOS DE DÚVIDAS NÃO RELACIONADAS ÀS OUTRAS FUNÇÕES/AÇÕES)\n* Dúvidas gerais sobre o negócio: horário de atendimento; custo de delivery; problemas com produtos (produto danificado, alergias etc.) ou entregas (atraso, entrega incompleta); reclamações; devoluções; reembolso; cadastro; ...\n* Não selecionar esta opção se a dúvida se enquadrar em outra categoria primeiro (quais categorias, produtos, promoções, informações sobre um produto específico, ...)\n* Quaisquer outros tipos de dúvidas não explicitadas\n(OBS: Consultar <REGRAS-DE-NEGOCIO> abaixo para responder a isso)\n\n<REGRAS-DE-NEGOCIO>\n* Dúvidas gerais sobre o negócio: \n- horário de atendimento: 8h a 18h; \n- custo de delivery: R$ 5.00; \n- problemas com produtos (produto danificado, alergias etc.) ou entregas (atraso, entrega incompleta); reclamações; devoluções; reembolso; cadastro;: deve-se dizer para \"aguardar um momento\" e que o cliente será encaminhado para o gerente.\n* Quaisquer outros tipos de dúvidas não explicitadas: deve-se dizer para \"aguardar um momento\" e que o cliente será encaminhado para o gerente.\n</REGRAS-DE-NEGOCIO>"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        992
+      ],
+      "id": "71b2901f-6466-4774-afd2-ef918bab1a2f",
+      "name": "Formatador Regras Negocio",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "from": "={{ $('Dados-cliente').first().json[\"twilio_number\"]}}",
+        "to": "={{ $('Dados-cliente').first().json.number}}",
+        "message": "={{ $('Formatador Regras Negocio').item.json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        992
+      ],
+      "id": "d785ed13-0b4d-4e3b-a42f-9af9c2f89d3e",
+      "name": "Sender (SMS/MMS/WhatsApp)",
+      "credentials": {
+        "twilioApi": {
+          "id": "KDMLpntrZ3ERQmzY",
+          "name": "Twilio Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sistd-final",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1200,
+        704
+      ],
+      "id": "4a615529-9401-4e88-a670-bd54b063da01",
+      "name": "Webhook Twilio",
+      "webhookId": "11f737ef-b89e-44f5-85d1-13dd7be7fa71"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Espera para responder": {
+      "main": [
+        [
+          {
+            "node": "Pega Msg Acumuladas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acumula Msg": {
+      "main": [
+        [
+          {
+            "node": "check wait-time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pega Msg Acumuladas": {
+      "main": [
+        [
+          {
+            "node": "Seleciona Funcao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait-time": {
+      "main": [
+        [
+          {
+            "node": "Espera para responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [],
+        [
+          {
+            "node": "wait-time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Seleciona Funcao",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seleciona Funcao": {
+      "main": [
+        [
+          {
+            "node": "Roteador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Seleciona Funcao",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check wait-time": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Formatador Regras Negocio",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Formatador Regras Negocio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Twilio Number": {
+      "main": [
+        [
+          {
+            "node": "Acumula Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Number": {
+      "main": [
+        [
+          {
+            "node": "Set Twilio Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados-cliente": {
+      "main": [
+        [
+          {
+            "node": "Numeros-Permitidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis": {
+      "main": [
+        [
+          {
+            "node": "Send an SMS/MMS/WhatsApp message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Produtos-Ciclo-Atual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Produtos-Promo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Infos-Prod",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Produtos-Promo": {
+      "main": [
+        [
+          {
+            "node": "Formatador Regras Negocio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Produtos-Ciclo-Atual": {
+      "main": [
+        [
+          {
+            "node": "Formatador Regras Negocio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Todas-Categorias": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Infos-Prod": {
+      "main": [
+        [
+          {
+            "node": "Is-prod-in-promo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Formatador Regras Negocio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Roteador": {
+      "main": [
+        [
+          {
+            "node": "Redis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Formatador Regras Negocio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Todas-Categorias",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Numeros-Permitidos": {
+      "main": [
+        [
+          {
+            "node": "Set Number",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is-prod-in-promo": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatador Regras Negocio": {
+      "main": [
+        [
+          {
+            "node": "Sender (SMS/MMS/WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Twilio": {
+      "main": [
+        [
+          {
+            "node": "Dados-cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6c17fe0e-16c6-44c6-8254-5f628420689d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "30bcba3bde43f0b053563b01381af925ee27cfd04f116168184ddfd69e5e3d04"
+  },
+  "id": "m9jIWOIPfuHyoi0v",
+  "tags": [
+    {
+      "createdAt": "2025-11-20T13:01:48.648Z",
+      "updatedAt": "2025-11-20T13:01:48.648Z",
+      "id": "21375BpbJIfw6xfn",
+      "name": "DISC_Sist-D"
+    }
+  ]
+}
