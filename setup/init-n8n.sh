@@ -6,9 +6,10 @@ echo "🚀 [n8n-init] Iniciando configuração automática..."
 echo "🔄 [n8n-init] Substituindo secrets no template de credenciais..."
 # O comando 'envsubst' substitui as variáveis (${...}) do template com os valores reais injetados pelo Docker Compose/env.
 envsubst < /setup/credentials.template.json > /setup/credentials.json
+echo "✅ [n8n-init] Template de credenciais gerado com sucesso."
 
 # O n8n precisa que o arquivo de credenciais não seja read-only
-# O volume /setup foi montado como :ro (read-only), entã criou-se o arquivo de destino (credentials.json) em /setup/ para o n8n poder rodar o import.
+# Criou-se o arquivo de destino (credentials.json) em /setup/ para o n8n poder rodar o import.
 # Como o arquivo foi criado dentro do container, ele pertence ao UID 1000.
 
 

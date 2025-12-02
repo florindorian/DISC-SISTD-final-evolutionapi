@@ -10,6 +10,7 @@ services:
     restart: always
     ports:
       - 9000:5678
+    user: root # Executa o entrypoint como root para instalar utilitários
     entrypoint: ["/setup/docker-entrypoint.sh"]
     environment:
       # Autenticação
@@ -35,7 +36,7 @@ services:
       - ./volumes/.n8n:/home/node/.n8n
       - ./volumes/shared:/data/shared
       - ./volumes/local-files:/files
-      - ./setup:/setup:ro  # ⬅️ Monta diretório setup (read-only)
+      - ./setup:/setup
       
     networks:
       - sistd-net
