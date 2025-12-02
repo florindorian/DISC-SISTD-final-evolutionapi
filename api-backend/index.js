@@ -14,7 +14,7 @@ const port = process.env.PORT || 3001;
 app.use(bodyParser.json());
 
 // 3. Configurações do MongoDB
-const uri = process.env.MONGO_URI;
+const uri = process.env.MONGO_CONNECTION_STRING;
 const dbName = process.env.MONGO_DB_NAME;
 const collectionName = process.env.MONGO_COLLECTION_NAME;
 
