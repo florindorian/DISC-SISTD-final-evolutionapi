@@ -2,13 +2,24 @@
 
 Este projeto implementa um atendente virtual inteligente via **WhatsApp** para a `CodeParfum`, uma loja fictícia de perfumaria e cosméticos em geral. A solução utiliza **n8n** para orquestrar o fluxo de automação, **Gemini** como o cérebro de IA para interpretar as intenções do cliente e gerar respostas, e **Twilio** para a comunicação com o WhatsApp.
 
+<div style="text-align: center;">
+    <div style="display: inline-flex; justify-content: center; align-items: stretch; max-width: 90%; min-height: 250px;">
+        <a href="#" title="#" style="width: 70%; margin-right: 10px;">
+            <img src="./docs/Setup/img/workflow-layout.png" alt="aparencia-workflow" style="width: 100%; height: 100%; object-fit: contain;">
+        </a>
+        <a href="#" title="#" style="width: 30%;">
+            <img src="./docs/Setup/img/exemplo_interacao.png" alt="exemplo_interacao">
+        </a>
+    </div>
+</div>
+
 **O atendente é capaz de:**
 - Responder a dúvidas gerais sobre o negócio (horário, entrega, etc.).
 - Consultar o catálogo de produtos e categorias.
 - Verificar promoções ativas em um determinado ciclo de vendas.
 - Fornecer informações detalhadas sobre produtos específicos.
 
-**Proposta de valor:**
+**Propostas de valor:**
 - Atendimento personalizado e vendedor
 - Atendimento a um volume muito maior de clientes em comparação com um atendente humano.
 - Possibilidade alavancar um negócio pequeno sem grandes custos com mão de obra humana para atendimento.
@@ -25,7 +36,7 @@ Antes de começar, certifique-se de que você tem as seguintes ferramentas insta
     -   Você precisará de uma conta gratuita no site do ngrok.
 
 3.  **Google Gemini API:** Para o processamento de linguagem natural.
-    -   Você precisará de uma chave de API, que pode ser obtida na Google AI Studio.
+    -   Você precisará de uma chave de API, que pode ser obtida na Google AI Studio, conforme instruções em [./docs/Setup/gemini-apikey.md](./docs/Setup/gemini-apikey.md).
 
 4.  **Twilio:** Para enviar e receber mensagens via WhatsApp.
     -   Você precisará de uma conta no site do Twilio.
@@ -133,6 +144,13 @@ Por fim, ao abrir o Workflow, no menu superior, habilite a opção `Active` ✅.
 
 Pronto! Agora você pode enviar uma mensagem para o seu número WhatsApp do Twilio (em Sandbox). Após você cadastrar seu número pessoal nas configurações do Sandbox conforme orienta [docs/Setup/twilio.md](./docs/Setup/twilio.md), já será possível conversar com o atendente da CodePafum.
 
+Experimente alguns casos de teste exemplificados em: 
 
-# URL REPO:
-https://github.com/florindorian/DISC-SISTD-final-evolutionapi
+- [docs/Entrega-Final/CASOS_DE_TESTE.pdf](../Entrega-Final/CASOS_DE_TESTE.pdf)
+    
+- [docs/Entrega-Final/CASOS_DE_TESTE_(POR_FUNCIONALIDADE).pdf](../Entrega-Final/CASOS_DE_TESTE_(POR_FUNCIONALIDADE).pdf)
+
+
+## 👨‍💻 Autor
+
+<a href="https://github.com/florindorian"><img src="https://github.com/florindorian.png" width=100></a>
