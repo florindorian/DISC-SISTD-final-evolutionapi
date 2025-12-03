@@ -2,16 +2,14 @@
 
 Este projeto implementa um atendente virtual inteligente via **WhatsApp** para a `CodeParfum`, uma loja fictícia de perfumaria e cosméticos em geral. A solução utiliza **n8n** para orquestrar o fluxo de automação, **Gemini** como o cérebro de IA para interpretar as intenções do cliente e gerar respostas, e **Twilio** para a comunicação com o WhatsApp.
 
-<div style="text-align: center;">
-    <div style="display: inline-flex; justify-content: center; align-items: stretch; max-width: 90%; min-height: 250px;">
-        <a href="#" title="#" style="width: 70%; margin-right: 10px;">
-            <img src="./docs/Setup/img/workflow-layout.png" alt="aparencia-workflow" style="width: 100%; height: 100%; object-fit: contain;">
-        </a>
-        <a href="#" title="#" style="width: 30%;">
-            <img src="./docs/Setup/img/exemplo_interacao.png" alt="exemplo_interacao">
-        </a>
-    </div>
-</div>
+<p align="center">
+    <a href="#" title="#">
+        <img src="./docs/Setup/img/workflow-layout.png" alt="aparencia-workflow" height="300" style="vertical-align: middle; margin-right: 10px;">
+    </a>
+    <a href="#" title="#">
+        <img src="./docs/Setup/img/exemplo_interacao.png" alt="exemplo_interacao" height="300" style="vertical-align: middle;">
+    </a>
+</p>
 
 **O atendente é capaz de:**
 - Responder a dúvidas gerais sobre o negócio (horário, entrega, etc.).
