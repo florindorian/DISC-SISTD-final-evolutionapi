@@ -6,15 +6,16 @@ Este projeto implementa um atendente virtual inteligente via **WhatsApp** para a
 **Vídeo de Apresentação do Projeto**
 
 <p align="center">
-    <a href="https://youtu.be/AorcYF-6ewM" title="#">
+    <a href="https://youtu.be/CzLVC8BkWKM" title="#">
         <img src="./docs/Setup/img/workflow-layout.png" alt="aparencia-workflow" height="300" style="vertical-align: middle; margin-right: 10px;">
     </a>
-    <a href="https://youtu.be/AorcYF-6ewM" title="#">
+    <a href="https://youtu.be/CzLVC8BkWKM" title="#">
         <img src="./docs/Setup/img/exemplo_interacao.png" alt="exemplo_interacao" height="300" style="vertical-align: middle;">
     </a>
 </p>
 
-Link: https://youtu.be/AorcYF-6ewM
+Link Apresentação: https://youtu.be/CzLVC8BkWKM
+Instruções de configuração em vídeo: https://youtu.be/vez-frGSJUI
 
 **O atendente é capaz de:**
 - Responder a dúvidas gerais sobre o negócio (horário, entrega, etc.).
