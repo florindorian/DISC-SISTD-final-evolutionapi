@@ -15,6 +15,7 @@ Este projeto implementa um atendente virtual inteligente via **WhatsApp** para a
 </p>
 
 Link Apresentação: https://youtu.be/CzLVC8BkWKM
+
 Instruções de configuração em vídeo: https://youtu.be/vez-frGSJUI
 
 **O atendente é capaz de:**
